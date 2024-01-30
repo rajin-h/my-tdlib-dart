@@ -45,7 +45,7 @@ class _MainChatSectionState extends State<MainChatSection> {
             const SizedBox(height: 15),
             ElevatedButton(
               onPressed: () {
-                widget.chatService?.getChats(10);
+                widget.chatService?.getChats(100);
               },
               child: const Text('get chats'),
             ),
@@ -55,29 +55,37 @@ class _MainChatSectionState extends State<MainChatSection> {
                 'Chat Name:  ${openedChat?.name?.toString()}',
                 style: TextStyle(fontSize: 15),
               ),
-              if (openedChat?.messages != null) ...[
-                for (int i = 0; i < openedChat!.messages!.length; i++) ...[
-                  Container(
-                    color: Colors.amberAccent,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          '${openedChat?.messages?[i].content}',
-                          style: TextStyle(fontSize: 15),
-                        ),
-                        Text(
-                          'from ${openedChat?.messages?[i].sender}',
-                          style: TextStyle(fontSize: 15),
-                        ),
-                        Text(
-                          '@ ${openedChat?.messages?[i].timeSent}',
-                          style: TextStyle(fontSize: 15),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              if (openedChat?.messages?.length != null) ...[
+                SizedBox(
+                  height: 300,
+                  child: ListView.separated(
+                      itemBuilder: (context, i) {
+                        return Container(
+                          color: Colors.amberAccent,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                '${openedChat?.messages?[i].content}',
+                                style: TextStyle(fontSize: 15),
+                              ),
+                              Text(
+                                'from ${openedChat?.messages?[i].sender}',
+                                style: TextStyle(fontSize: 15),
+                              ),
+                              Text(
+                                '@ ${openedChat?.messages?[i].timeSent}',
+                                style: TextStyle(fontSize: 15),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      separatorBuilder: (context, index) {
+                        return const SizedBox(height: 15);
+                      },
+                      itemCount: openedChat?.messages?.length ?? 0),
+                ),
                 TextField(
                   decoration: InputDecoration(
                     border: OutlineInputBorder(),
@@ -124,7 +132,8 @@ class _MainChatSectionState extends State<MainChatSection> {
                                       : '',
                                 )
                                 .toList()
-                                .firstWhere((e) => e.isNotEmpty);
+                                .first
+                                .toString();
 
                             openedChat?.messages = messages
                                 .where((e) => e.content is api.MessageText)
@@ -134,6 +143,8 @@ class _MainChatSectionState extends State<MainChatSection> {
                                         .userId
                                         .toString(),
                                     e.date.toString()))
+                                .toList()
+                                .reversed
                                 .toList();
                           }
                         });

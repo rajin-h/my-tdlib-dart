@@ -145,6 +145,30 @@ class _MyAppState extends State<MyApp> {
       });
     }
 
+    if (event is td.UpdateChatLastMessage) {
+      if (_chatData?.chats == null) {
+        setState(() {
+          _chatData = ChatList([]);
+        });
+      }
+
+      // need to update specific chat in the chat list with the new message
+      final chatdata = await _chatService?.getChatData(event.chatId);
+      if (chatdata != null) {
+        setState(() {
+          // replace the chat with the new one
+
+          _chatData!.chats!
+              .firstWhere((e) => e.id! == chatdata.id)
+              .messages
+              ?.add(chatdata.messages!.last);
+
+          _chatData!.chats!
+              .map((e) => print('event: updating -> ${e.messages?.length}'));
+        });
+      }
+    }
+
     if (event is td.UpdateBasicGroup) {
       if (_chatData?.chats == null) {
         setState(() {
