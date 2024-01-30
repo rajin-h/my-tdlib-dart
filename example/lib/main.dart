@@ -1,5 +1,11 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:example/models/chat.dart';
+import 'package:example/models/user.dart';
+import 'package:example/services/chat_service.dart';
+import 'package:example/widgets/code_verification_section.dart';
+import 'package:example/widgets/main_chat_section.dart';
+import 'package:example/widgets/mobile_number_section.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -13,31 +19,6 @@ Future<void> main() async {
       debugShowCheckedModeBanner: false,
     ),
   );
-}
-
-int getApiId() {
-  throw StateError('Obtain `api_id` at https://my.telegram.org');
-}
-
-String getApiHash() {
-  throw StateError('Obtain `api_hash` at https://my.telegram.org');
-}
-
-const String _TestDCMessage = '''
-Check User Authorization article https://core.telegram.org/api/auth#test-accounts
-
-If you wish to emulate an application of a user associated with DC number X, it 
-is sufficient to specify the phone number as 99966XYYYY, where YYYY are random 
-numbers, when registering the user. A user like this would always get XXXXX as 
-the login confirmation code (the DC number, repeated five times). 
-''';
-
-String getPhoneNumber() {
-  throw StateError(_TestDCMessage);
-}
-
-String getCode() {
-  throw StateError(_TestDCMessage);
 }
 
 class MyApp extends StatefulWidget {
@@ -56,6 +37,11 @@ class _MyAppState extends State<MyApp> {
   td.AuthorizationState? _authorizationState;
   td.ConnectionState? _connectionState;
 
+  ChatService? _chatService;
+
+  User? _userData;
+  ChatList? _chatData;
+
   @override
   void dispose() {
     _destroy();
@@ -64,55 +50,90 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    print('event: _chatData ${_chatData}');
     return Scaffold(
       appBar: AppBar(),
-      body: Column(
-        children: <Widget>[
-          ListTile(
-            title: const Text('last event'),
-            subtitle: Text('${_lastEvent?.toJson()}'),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            children: <Widget>[
+              ListTile(
+                title: ListBody(
+                  children: [
+                    if (_userData != null) ...[
+                      MainChatSection(
+                        currentUser: _userData,
+                        client: _client,
+                        chatService: _chatService,
+                        chatList: _chatData,
+                      ),
+                    ],
+                    if (_authorizationState
+                        is td.AuthorizationStateWaitPhoneNumber) ...[
+                      MobileNumberSection(
+                        client: _client,
+                        authorizationState: _authorizationState,
+                      ),
+                      const SizedBox(height: 15),
+                    ],
+                    if (_authorizationState is td.AuthorizationStateWaitCode)
+                      CodeVerificationSection(
+                        client: _client,
+                        authorizationState: _authorizationState,
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                title: const Text('last event'),
+                subtitle: Text('${_lastEvent?.toJson()}'),
+              ),
+              ListTile(
+                title: const Text('authorizationState'),
+                subtitle: Text('${_authorizationState?.runtimeType}'),
+              ),
+              ListTile(
+                title: const Text('connectionState'),
+                subtitle: Text('${_connectionState?.runtimeType}'),
+              ),
+              const Divider(),
+              ListTile(
+                title: const Text('initialize'),
+                onTap: _initialize,
+              ),
+              ListTile(
+                title: const Text('destroy'),
+                onTap: _destroy,
+              ),
+              const Divider(),
+              ListTile(
+                title: const Text('set network none'),
+                onTap: () {
+                  _client?.send(
+                    const td.SetNetworkType(type: td.NetworkTypeNone()),
+                  );
+                },
+              ),
+              ListTile(
+                title: const Text('set network wifi'),
+                onTap: () {
+                  _client?.send(
+                    const td.SetNetworkType(type: td.NetworkTypeWiFi()),
+                  );
+                },
+              ),
+              ListTile(
+                title:
+                    const Text('logout', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  _client?.send(const td.LogOut());
+                },
+              ),
+            ],
           ),
-          ListTile(
-            title: const Text('authorizationState'),
-            subtitle: Text('${_authorizationState?.runtimeType}'),
-          ),
-          ListTile(
-            title: const Text('connectionState'),
-            subtitle: Text('${_connectionState?.runtimeType}'),
-          ),
-          const Divider(),
-          ListTile(
-            title: const Text('initialize'),
-            onTap: _initialize,
-          ),
-          ListTile(
-            title: const Text('destroy'),
-            onTap: _destroy,
-          ),
-          const Divider(),
-          ListTile(
-            title: const Text('set network none'),
-            onTap: () {
-              _client?.send(
-                const td.SetNetworkType(type: td.NetworkTypeNone()),
-              );
-            },
-          ),
-          ListTile(
-            title: const Text('set network wifi'),
-            onTap: () {
-              _client?.send(
-                const td.SetNetworkType(type: td.NetworkTypeWiFi()),
-              );
-            },
-          ),
-          ListTile(
-            title: const Text('logout', style: TextStyle(color: Colors.red)),
-            onTap: () {
-              _client?.send(const td.LogOut());
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -123,6 +144,44 @@ class _MyAppState extends State<MyApp> {
         _connectionState = event.state;
       });
     }
+
+    if (event is td.UpdateBasicGroup) {
+      if (_chatData?.chats == null) {
+        setState(() {
+          _chatData = ChatList([]);
+        });
+      }
+
+      if (_chatData!.chats!.every((e) => e.id != event.basicGroup.id)) {
+        final chatdata = await _chatService?.getChatData(event.basicGroup.id);
+
+        if (chatdata != null) {
+          setState(() {
+            _chatData!.chats!.add(chatdata);
+          });
+        }
+      }
+    }
+
+    if (event is td.UpdateUser) {
+      final user = await _chatService?.getUser(event.user.id);
+
+      setState(() {
+        _userData = User(user?.id, user?.firstName, user?.lastName);
+      });
+    } else if (event is td.UpdateOption) {
+      if (event.name == "my_id") {
+        final val = event.value.toJson();
+        int id = int.parse(val['value']);
+        final user = await _chatService?.getUser(id);
+
+        setState(() {
+          _userData = User(user?.id, user?.firstName, user?.lastName);
+        });
+      }
+    }
+
+    print('event: ${event.toJson()}');
 
     setState(() {
       _lastEvent = event;
@@ -142,7 +201,7 @@ class _MyAppState extends State<MyApp> {
       await _client?.send(
         td.SetTdlibParameters(
           systemVersion: '',
-          useTestDc: true,
+          useTestDc: false,
           useSecretChats: false,
           useMessageDatabase: true,
           useFileDatabase: true,
@@ -154,17 +213,11 @@ class _MyAppState extends State<MyApp> {
           systemLanguageCode: 'en',
           deviceModel: 'unknown',
           applicationVersion: '1.0.0',
-          apiId: getApiId(),
-          apiHash: getApiHash(),
+          apiId: 25016349,
+          apiHash: '204b31a82be0f184092705e8254a87ba',
           databaseEncryptionKey: '',
         ),
       );
-    } else if (authorizationState is td.AuthorizationStateWaitPhoneNumber) {
-      await _client?.send(
-        td.SetAuthenticationPhoneNumber(phoneNumber: getPhoneNumber()),
-      );
-    } else if (authorizationState is td.AuthorizationStateWaitCode) {
-      await _client?.send(td.CheckAuthenticationCode(code: getCode()));
     }
   }
 
@@ -175,6 +228,7 @@ class _MyAppState extends State<MyApp> {
 
     final Client newClient = Client.create();
     _client = newClient;
+    _chatService = ChatService(newClient);
     _eventsSubscription?.cancel();
     _eventsSubscription = newClient.updates.listen(_onNewEvent);
     newClient.initialize();
@@ -184,6 +238,7 @@ class _MyAppState extends State<MyApp> {
     _client?.destroy();
     _eventsSubscription?.cancel();
     _client = null;
+    _chatService = null;
 
     setState(() {
       _connectionState = null;
