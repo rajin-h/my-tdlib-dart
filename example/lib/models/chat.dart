@@ -8,7 +8,15 @@ class Chat {
   String? name;
   int? memberCount;
 
-  List<String>? messages;
+  List<ChatItem>? messages;
 
   Chat(this.id, this.name, this.memberCount);
+}
+
+class ChatItem {
+  String? content;
+  String? sender;
+  String? timeSent;
+
+  ChatItem(this.content, this.sender, this.timeSent);
 }
