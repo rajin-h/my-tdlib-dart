@@ -137,37 +137,10 @@ class _MainChatSectionState extends State<MainChatSection> {
                                         '0') *
                                 1000);
 
-                        return Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(5),
-                              border: Border.all(color: Colors.blue)),
-                          child: IntrinsicHeight(
-                            child: Wrap(
-                              alignment: WrapAlignment.spaceBetween,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Text(
-                                  '${getOpenedChat()?.messages?[i].content}',
-                                  style: TextStyle(fontSize: 15),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'from ${getOpenedChat()?.messages?[i].sender}',
-                                      style: TextStyle(fontSize: 15),
-                                    ),
-                                    Text(
-                                      '${timestamp.day}/${timestamp.month}/${timestamp.year} ${timestamp.hour}:${timestamp.minute}',
-                                      style: TextStyle(fontSize: 15),
-                                    ),
-                                  ],
-                                )
-                              ],
-                            ),
-                          ),
-                        );
+                        return MessageBubble(
+                            currentUserId: widget.currentUser?.id ?? 0,
+                            chatItem: getOpenedChat()?.messages?[i],
+                            timestamp: timestamp);
                       },
                       separatorBuilder: (context, index) {
                         return const SizedBox(height: 15);
@@ -321,6 +294,62 @@ class _MainChatSectionState extends State<MainChatSection> {
                 ),
               ),
             ]
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class MessageBubble extends StatelessWidget {
+  const MessageBubble({
+    required this.currentUserId,
+    required this.chatItem,
+    required this.timestamp,
+  });
+
+  final int currentUserId;
+  final ChatItem? chatItem;
+  final DateTime timestamp;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(8),
+      margin: EdgeInsets.only(
+          left: currentUserId == int.parse(chatItem?.sender ?? '') ? 100 : 0,
+          right: currentUserId == int.parse(chatItem?.sender ?? '') ? 0 : 100),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(5),
+        color: currentUserId == int.parse(chatItem?.sender ?? '')
+            ? Colors.blue
+            : Color.fromARGB(255, 45, 158, 0),
+      ),
+      child: IntrinsicHeight(
+        child: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(
+              '${chatItem?.content}',
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.white,
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  'from ${chatItem?.sender}',
+                  style: TextStyle(fontSize: 10, color: Colors.white),
+                ),
+                Text(
+                  '@ ${timestamp.day}/${timestamp.month}/${timestamp.year} ${timestamp.hour}:${timestamp.minute}',
+                  style: TextStyle(fontSize: 10, color: Colors.white),
+                ),
+              ],
+            )
           ],
         ),
       ),
