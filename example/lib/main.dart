@@ -50,7 +50,6 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    print('event: _chatData ${_chatData}');
     return Scaffold(
       appBar: AppBar(),
       body: SingleChildScrollView(
@@ -153,18 +152,28 @@ class _MyAppState extends State<MyApp> {
       }
 
       // need to update specific chat in the chat list with the new message
-      final chatdata = await _chatService?.getChatData(event.chatId);
+      final chatdata = await _chatService?.getChatData(-1 * event.chatId);
       if (chatdata != null) {
+        final messages = await _chatService?.getMessages(
+          -1 * chatdata.id!,
+          0,
+          100,
+        );
+
+        chatdata.messages = messages
+            ?.where((e) => e.content is td.MessageText)
+            .map((e) => ChatItem(
+                (e.content as td.MessageText).text.text,
+                (e.senderId as td.MessageSenderUser).userId.toString(),
+                e.date.toString()))
+            .toList()
+            .reversed
+            .toList();
+
         setState(() {
           // replace the chat with the new one
-
-          _chatData!.chats!
-              .firstWhere((e) => e.id! == chatdata.id)
-              .messages
-              ?.add(chatdata.messages!.last);
-
-          _chatData!.chats!
-              .map((e) => print('event: updating -> ${e.messages?.length}'));
+          _chatData!.chats!.firstWhere((e) => e.id! == chatdata.id!).messages =
+              chatdata.messages;
         });
       }
     }

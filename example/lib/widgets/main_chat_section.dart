@@ -23,87 +23,206 @@ class MainChatSection extends StatefulWidget {
 }
 
 class _MainChatSectionState extends State<MainChatSection> {
-  Chat? openedChat;
+  int? openedChatId;
+
+  TextEditingController _messageTextController = TextEditingController();
+  TextEditingController _chatIdTextController = TextEditingController();
+
+  ScrollController _scrollController = ScrollController();
+
+  Chat? getOpenedChat() {
+    final a = widget.chatList?.chats?.firstWhere(
+      (e) => e.id == openedChatId,
+      orElse: () => Chat(-1, '', 2),
+    );
+
+    if (a?.id == -1) {
+      return null;
+    }
+
+    return a;
+  }
+
+  Future<void> sendMessage(String message) async {
+    await widget.chatService?.sendMessage(
+      (-1 * getOpenedChat()!.id!),
+      message,
+    );
+
+    _messageTextController.clear();
+  }
+
+  Future<void> joinChat(String chatID) async {
+    await widget.chatService?.joinChat(int.parse(chatID));
+  }
+
+  @override
+  void dispose() {
+    _messageTextController.dispose();
+    _chatIdTextController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeOut,
+      );
+    }
+
     return Card(
       elevation: 5,
       child: Padding(
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'User ID:  ${widget.currentUser?.id?.toString()}',
-              style: TextStyle(fontSize: 15),
+            Row(
+              children: [
+                Text(
+                  'User ID: ',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${widget.currentUser?.id?.toString()}',
+                  style: TextStyle(fontSize: 15),
+                ),
+              ],
             ),
-            Text(
-              'Name:  ${widget.currentUser?.firstName?.toString()} ${widget.currentUser?.lastName?.toString()}',
-              style: TextStyle(fontSize: 15),
+            Row(
+              children: [
+                Text(
+                  'Name: ',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  '${widget.currentUser?.firstName?.toString()} ${widget.currentUser?.lastName?.toString()}',
+                  style: TextStyle(fontSize: 15),
+                ),
+              ],
             ),
             const SizedBox(height: 15),
             ElevatedButton(
               onPressed: () {
                 widget.chatService?.getChats(100);
               },
-              child: const Text('get chats'),
+              child: const Text('Load Chats'),
             ),
-            if (openedChat != null) ...[
+            if (getOpenedChat() != null) ...[
               const SizedBox(height: 15),
               Text(
-                'Chat Name:  ${openedChat?.name?.toString()}',
+                'Opened Chat',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Chat ID: ${getOpenedChat()?.id.toString()}',
                 style: TextStyle(fontSize: 15),
               ),
-              if (openedChat?.messages?.length != null) ...[
+              const SizedBox(height: 15),
+              if (getOpenedChat()?.messages?.length != null) ...[
                 SizedBox(
                   height: 300,
                   child: ListView.separated(
+                      controller: _scrollController,
                       itemBuilder: (context, i) {
+                        DateTime timestamp =
+                            DateTime.fromMillisecondsSinceEpoch(int.parse(
+                                    getOpenedChat()?.messages?[i].timeSent ??
+                                        '0') *
+                                1000);
+
                         return Container(
-                          color: Colors.amberAccent,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                '${openedChat?.messages?[i].content}',
-                                style: TextStyle(fontSize: 15),
-                              ),
-                              Text(
-                                'from ${openedChat?.messages?[i].sender}',
-                                style: TextStyle(fontSize: 15),
-                              ),
-                              Text(
-                                '@ ${openedChat?.messages?[i].timeSent}',
-                                style: TextStyle(fontSize: 15),
-                              ),
-                            ],
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(5),
+                              border: Border.all(color: Colors.blue)),
+                          child: IntrinsicHeight(
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  '${getOpenedChat()?.messages?[i].content}',
+                                  style: TextStyle(fontSize: 15),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      'from ${getOpenedChat()?.messages?[i].sender}',
+                                      style: TextStyle(fontSize: 15),
+                                    ),
+                                    Text(
+                                      '${timestamp.day}/${timestamp.month}/${timestamp.year} ${timestamp.hour}:${timestamp.minute}',
+                                      style: TextStyle(fontSize: 15),
+                                    ),
+                                  ],
+                                )
+                              ],
+                            ),
                           ),
                         );
                       },
                       separatorBuilder: (context, index) {
                         return const SizedBox(height: 15);
                       },
-                      itemCount: openedChat?.messages?.length ?? 0),
+                      itemCount: getOpenedChat()?.messages?.length ?? 0),
                 ),
-                TextField(
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(),
-                    hintText: 'Message',
+                const SizedBox(height: 15),
+                IntrinsicHeight(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Flexible(
+                        flex: 4,
+                        child: TextField(
+                          controller: _messageTextController,
+                          onSubmitted: (value) {
+                            sendMessage(_messageTextController.text.trim());
+                          },
+                          decoration: InputDecoration(
+                            border: OutlineInputBorder(),
+                            hintText: 'Message',
+                          ),
+                        ),
+                      ),
+                      Flexible(
+                        flex: 1,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            sendMessage(_messageTextController.text.trim());
+                          },
+                          child: const Text('Send'),
+                        ),
+                      ),
+                    ],
                   ),
-                  onSubmitted: (value) async {
-                    await widget.chatService?.sendMessage(
-                      (-1 * openedChat!.id!),
-                      value,
-                    );
-                  },
                 ),
               ],
             ],
             if (widget.chatList != null) ...[
+              const SizedBox(height: 30),
+              Text(
+                'Chats',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Below are some of your recent chats. Tap on any of them to open it.',
+                style: TextStyle(fontSize: 15),
+              ),
               const SizedBox(height: 15),
               Container(
-                height: 300,
+                height: 250,
                 child: ListView.separated(
                   separatorBuilder: (context, index) {
                     return const SizedBox(height: 15);
@@ -115,27 +234,14 @@ class _MainChatSectionState extends State<MainChatSection> {
                         final messages = await widget.chatService?.getMessages(
                           -1 * widget.chatList!.chats![index].id!,
                           0,
-                          10,
+                          100,
                         );
 
                         setState(() {
-                          openedChat = widget.chatList?.chats?[index];
+                          openedChatId = widget.chatList?.chats?[index].id;
 
                           if (messages != null) {
-                            openedChat?.name = messages
-                                .map(
-                                  (e) => e.content
-                                          is api.MessageBasicGroupChatCreate
-                                      ? (e.content as api
-                                              .MessageBasicGroupChatCreate)
-                                          .title
-                                      : '',
-                                )
-                                .toList()
-                                .first
-                                .toString();
-
-                            openedChat?.messages = messages
+                            getOpenedChat()?.messages = messages
                                 .where((e) => e.content is api.MessageText)
                                 .map((e) => ChatItem(
                                     (e.content as api.MessageText).text.text,
@@ -161,19 +267,59 @@ class _MainChatSectionState extends State<MainChatSection> {
                               'Chat',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
                             Text(
-                                'chat_id: ${widget.chatList?.chats?[index].id.toString() ?? ''}'),
+                              'chat_id: ${widget.chatList?.chats?[index].id.toString() ?? ''}',
+                              style: TextStyle(
+                                color: Colors.white,
+                              ),
+                            ),
                             Text(
-                                'member_count: ${widget.chatList?.chats?[index].memberCount.toString() ?? ''}'),
+                              'member_count: ${widget.chatList?.chats?[index].memberCount.toString() ?? ''}',
+                              style: TextStyle(
+                                color: Colors.white,
+                              ),
+                            ),
                           ],
                         ),
                       ),
                     );
                   },
                 ),
-              )
+              ),
+              const SizedBox(height: 15),
+              IntrinsicHeight(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Flexible(
+                      flex: 4,
+                      child: TextField(
+                        controller: _chatIdTextController,
+                        onSubmitted: (value) {
+                          joinChat(_chatIdTextController.text.trim());
+                        },
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(),
+                          hintText: 'Chat ID',
+                        ),
+                      ),
+                    ),
+                    Flexible(
+                      flex: 1,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          sendMessage(_messageTextController.text.trim());
+                        },
+                        child: const Text('Join'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ]
           ],
         ),
